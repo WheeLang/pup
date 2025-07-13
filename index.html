@@ -34,9 +34,9 @@
 
   <script>
     const MAIN_LIST_URL = "http://pkgs.pup.wheedev.org/list.txt";
-    const PPA_USERS = ["WheeLang", "Klydra"]; // Add more GitHub users as needed
+    const PPA_USERS = ["WheeLang", "Klydra"]; // Add more if needed
 
-    const container = document.getElementById('packages');
+    const container = document.getElementById("packages");
 
     async function fetchText(url) {
       try {
@@ -60,12 +60,12 @@
       }
     }
 
-    function createPackageCard(title, maintainer, description, ppa = null) {
+    function createPackageCard(name, maintainer, description, ppa = null) {
       const div = document.createElement("div");
       div.className = "package";
       div.innerHTML = `
         ${ppa ? `<div class="ppa-label">[ ${ppa} ]</div>` : ""}
-        <div class="pkg-title">${title}</div>
+        <div class="pkg-title">${name}</div>
         <div class="pkg-maintainer">by ${maintainer}</div>
         <div class="pkg-desc">${description}</div>
       `;
@@ -78,35 +78,46 @@
 
       const packages = list.trim().split("\n");
       for (const pkg of packages) {
-        const pkgYML = await fetchYAML(`http://pkgs.pup.wheedev.org/${pkg}/package.choco.yml`);
+        const ymlUrl = `http://pkgs.pup.wheedev.org/${pkg}.choco.yml`;
+        const pkgYML = await fetchYAML(ymlUrl);
         if (!pkgYML || !pkgYML.url) continue;
 
-        const thread = await fetchYAML(pkgYML.url);
-        if (!thread) continue;
+        const threadYML = await fetchYAML(pkgYML.url);
+        if (!threadYML) continue;
 
-        createPackageCard(thread.name || pkg, thread.maintainer || "Unknown", thread.description || "No description");
+        createPackageCard(
+          threadYML.name || pkg,
+          threadYML.maintainer || "Unknown",
+          threadYML.description || "No description"
+        );
       }
     }
 
     async function loadPPAPackages() {
       for (const user of PPA_USERS) {
-        const reposTxt = await fetchText(`http://ppa.pup.wheedev.org/${user}/ppa/list.txt`);
-        if (!reposTxt) continue;
+        const ppaList = await fetchText(`http://ppa.pup.wheedev.org/${user}/ppa/list.txt`);
+        if (!ppaList) continue;
 
-        const repos = reposTxt.trim().split("\n");
-        for (const ppa of repos) {
+        const ppas = ppaList.trim().split("\n");
+        for (const ppa of ppas) {
           const pkgList = await fetchText(`http://ppa.pup.wheedev.org/${user}/${ppa}/list.txt`);
           if (!pkgList) continue;
 
           const pkgs = pkgList.trim().split("\n");
           for (const pkg of pkgs) {
-            const pkgYML = await fetchYAML(`http://ppa.pup.wheedev.org/${user}/${ppa}/${pkg}/package.choco.yml`);
+            const ymlUrl = `http://ppa.pup.wheedev.org/${user}/${ppa}/${pkg}.choco.yml`;
+            const pkgYML = await fetchYAML(ymlUrl);
             if (!pkgYML || !pkgYML.url) continue;
 
-            const thread = await fetchYAML(pkgYML.url);
-            if (!thread) continue;
+            const threadYML = await fetchYAML(pkgYML.url);
+            if (!threadYML) continue;
 
-            createPackageCard(thread.name || pkg, thread.maintainer || user, thread.description || "No description", `ppa:${user}/${ppa}`);
+            createPackageCard(
+              threadYML.name || pkg,
+              threadYML.maintainer || user,
+              threadYML.description || "No description",
+              `ppa:${user}/${ppa}`
+            );
           }
         }
       }
@@ -118,7 +129,6 @@
       await loadPPAPackages();
     }
 
-    // Load YAML parser
     const script = document.createElement("script");
     script.src = "https://cdn.jsdelivr.net/npm/js-yaml@4/dist/js-yaml.min.js";
     script.onload = loadAllPackages;
