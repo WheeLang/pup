@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>🐶 HighBit Package Index</title>
+  <style>
+    body { font-family: sans-serif; background: #fafafa; padding: 2rem; }
+    h1 { font-size: 2rem; margin-bottom: 1rem; }
+    .package {
+      background: #fff;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-left: 4px solid #6c5ce7;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .ppa-label {
+      font-size: 0.9rem;
+      color: #999;
+      margin-bottom: 0.3rem;
+    }
+    .pkg-title {
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+    .pkg-maintainer {
+      font-size: 0.9rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <h1>🐶 HighBit Package Index</h1>
+  <div id="packages">Loading packages...</div>
+
+  <script>
+    const MAIN_LIST_URL = "http://pkgs.pup.wheedev.org/list.txt";
+    const PPA_USERS = ["WheeLang", "Klydra"]; // Add more GitHub users as needed
+
+    const container = document.getElementById('packages');
+
+    async function fetchText(url) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.text();
+      } catch (err) {
+        console.warn(`Failed to fetch ${url}:`, err);
+        return null;
+      }
+    }
+
+    async function fetchYAML(url) {
+      const text = await fetchText(url);
+      if (!text) return null;
+      try {
+        return jsyaml.load(text);
+      } catch (err) {
+        console.warn(`Failed to parse YAML at ${url}:`, err);
+        return null;
+      }
+    }
+
+    function createPackageCard(title, maintainer, description, ppa = null) {
+      const div = document.createElement("div");
+      div.className = "package";
+      div.innerHTML = `
+        ${ppa ? `<div class="ppa-label">[ ${ppa} ]</div>` : ""}
+        <div class="pkg-title">${title}</div>
+        <div class="pkg-maintainer">by ${maintainer}</div>
+        <div class="pkg-desc">${description}</div>
+      `;
+      container.appendChild(div);
+    }
+
+    async function loadMainPackages() {
+      const list = await fetchText(MAIN_LIST_URL);
+      if (!list) return;
+
+      const packages = list.trim().split("\n");
+      for (const pkg of packages) {
+        const pkgYML = await fetchYAML(`http://pkgs.pup.wheedev.org/${pkg}/package.choco.yml`);
+        if (!pkgYML || !pkgYML.url) continue;
+
+        const thread = await fetchYAML(pkgYML.url);
+        if (!thread) continue;
+
+        createPackageCard(thread.name || pkg, thread.maintainer || "Unknown", thread.description || "No description");
+      }
+    }
+
+    async function loadPPAPackages() {
+      for (const user of PPA_USERS) {
+        const reposTxt = await fetchText(`http://ppa.pup.wheedev.org/${user}/ppa/list.txt`);
+        if (!reposTxt) continue;
+
+        const repos = reposTxt.trim().split("\n");
+        for (const ppa of repos) {
+          const pkgList = await fetchText(`http://ppa.pup.wheedev.org/${user}/${ppa}/list.txt`);
+          if (!pkgList) continue;
+
+          const pkgs = pkgList.trim().split("\n");
+          for (const pkg of pkgs) {
+            const pkgYML = await fetchYAML(`http://ppa.pup.wheedev.org/${user}/${ppa}/${pkg}/package.choco.yml`);
+            if (!pkgYML || !pkgYML.url) continue;
+
+            const thread = await fetchYAML(pkgYML.url);
+            if (!thread) continue;
+
+            createPackageCard(thread.name || pkg, thread.maintainer || user, thread.description || "No description", `ppa:${user}/${ppa}`);
+          }
+        }
+      }
+    }
+
+    async function loadAllPackages() {
+      container.innerHTML = "";
+      await loadMainPackages();
+      await loadPPAPackages();
+    }
+
+    // Load YAML parser
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/js-yaml@4/dist/js-yaml.min.js";
+    script.onload = loadAllPackages;
+    document.head.appendChild(script);
+  </script>
+</body>
+</html>
