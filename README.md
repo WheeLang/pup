@@ -1,2 +1,2 @@
-# pup
-BitPuppy Package Index (browser)
+# HighBit
+BitPuppy/HighBit Package Index (browser)
